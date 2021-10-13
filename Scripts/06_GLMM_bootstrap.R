@@ -1,7 +1,11 @@
 ##############################################
-###  Mixed model to investigate turbine-related mortality
+### Mortality of fish passing turbines
+### Generalized Linear Mixed Model (GLMM) to investigate turbine-related mortality
 ### Author: Johannes Radinger
+### October 2021
 ##############################################
+
+# load libraries
 library(lme4)
 library(car)
 library(boot)
@@ -29,6 +33,7 @@ summary(turb_mort_df)
 #Define reference levels
 turb_mort_df <- within(turb_mort_df, species_code <- relevel(species_code, ref = "Sal_tru"))
 turb_mort_df <- within(turb_mort_df, turbine_type <- relevel(turbine_type, ref = "Kaplan"))
+turb_mort_df <- within(turb_mort_df, capacity_class <- relevel(capacity_class, ref = "SHP"))
 turb_mort_df <- within(turb_mort_df, sampling_method <- relevel(sampling_method, ref = "net"))
 
 # Standarize (mean/sd) single predictors
@@ -64,60 +69,67 @@ summary(mort_analysis_df)
 ########################
 ### Original model(s)
 ########################
-glmm_A <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled+turbine_type+
+glmm_A <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled+
                   (1|location)+(1|location:experiment)+
                   (1|family)+(1|family:species_code)+
-                  (1|sampling_method)+
                   (1|obs_effect),
                 family=binomial,
                 data=mort_analysis_df,
                 control=glmerControl(calc.derivs=FALSE))
-glmm_B <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled*turbine_type+
+glmm_B <- glmer(cbind(n_mort,n_not_mort)~turbine_type+
                   (1|location)+(1|location:experiment)+
                   (1|family)+(1|family:species_code)+
-                  (1|sampling_method)+
                   (1|obs_effect),
                 family=binomial,
                 data=mort_analysis_df,
                 control=glmerControl(calc.derivs=FALSE))
-summary(glmm_B)
-vif(glmm_B) 
-glmm_C <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled+
+glmm_C <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled+turbine_type+
                   (1|location)+(1|location:experiment)+
                   (1|family)+(1|family:species_code)+
-                  (1|sampling_method)+
                   (1|obs_effect),
                 family=binomial,
                 data=mort_analysis_df,
                 control=glmerControl(calc.derivs=FALSE))
-glmm_D <- glmer(cbind(n_mort,n_not_mort)~turbine_type+
+glmm_D <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled*turbine_type+
                   (1|location)+(1|location:experiment)+
                   (1|family)+(1|family:species_code)+
-                  (1|sampling_method)+
                   (1|obs_effect),
                 family=binomial,
                 data=mort_analysis_df,
                 control=glmerControl(calc.derivs=FALSE))
 glmm_E <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled*turbine_type+capacity_class+
+                (1|location)+(1|location:experiment)+
+                  (1|family)+(1|family:species_code)+
+                  (1|obs_effect),
+                family=binomial,
+                data=mort_analysis_df,
+                control=glmerControl(calc.derivs=FALSE))
+glmm_F <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled*turbine_type+sampling_method+
+                (1|location)+(1|location:experiment)+
+                  (1|family)+(1|family:species_code)+
+                  (1|obs_effect),
+                family=binomial,
+                data=mort_analysis_df,
+                control=glmerControl(calc.derivs=FALSE))
+glmm_G <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled*turbine_type+capacity_class+sampling_method+
                    (1|location)+(1|location:experiment)+
                    (1|family)+(1|family:species_code)+
-                  (1|sampling_method)+
                    (1|obs_effect),
                  family=binomial,
                  data=mort_analysis_df,
                  control=glmerControl(calc.derivs=FALSE))
 
 # Likelihoodratio-Test whether single variables and or interaction terms are relevant
-lrt_results <- anova(glmm_A,glmm_B,glmm_C,glmm_D,glmm_E)
+lrt_results <- anova(glmm_A,glmm_B,glmm_C,glmm_D,glmm_E,glmm_F,glmm_G)
 anova(glmm_B,glmm_E)
-anova(glmm_E,glmm_F)
+
 print(xtable(lrt_results, type = "latex"), file = "./Results_Figs_Tabs/LRT_anova_table.tex")
-### --> Complete model glmm_F with length and turbine type and their interaction and sampling method is 
+### --> Complete model glmm_G with length and turbine type and their interaction and sampling method + capacity class is 
 #### best model based on maximum-likelihood ratio test
 
 ### To assess overdispersion
-dispersion_glmer(glmm_F) #should not be over 1.4 https://www.rdocumentation.org/packages/blmeco/versions/1.4/topics/dispersion_glmer 
-overdisp_fun(glmm_F) #https://rdrr.io/github/markushuff/PsychHelperFunctions/man/overdisp_fun.html 
+dispersion_glmer(glmm_G) #should not be over 1.4 https://www.rdocumentation.org/packages/blmeco/versions/1.4/topics/dispersion_glmer 
+overdisp_fun(glmm_G) #https://rdrr.io/github/markushuff/PsychHelperFunctions/man/overdisp_fun.html 
 
 ################################
 #### Preparation for prediction 
@@ -129,14 +141,17 @@ predict_df_families <- cbind(n_mort = 0,
                              avg_length_scaled = scale(20,scale=scaling_length,center=F),
                              expand.grid(family = levels(mort_analysis_df$family),
                                          turbine_type = levels(mort_analysis_df$turbine_type),
-                                         sampling_method = levels(mort_analysis_df$sampling_method)),
+                                         sampling_method = "net",
+                                         capacity_class = "SHP"),
                              species_code=NA,obs_effect=NA,location=NA,experiment=NA)
 predict_df_families$predict_id <- paste("family_pred",seq(1,nrow(predict_df_families)),sep="_")
 
 predict_df_length <- cbind(n_mort = 0,
                            n_not_mort = 0,
                            expand.grid(avg_length = seq(1,105,1),
-                                       turbine_type = levels(mort_analysis_df$turbine_type)),
+                                       turbine_type = levels(mort_analysis_df$turbine_type),
+                                       sampling_method = "net",
+                                       capacity_class = "SHP"),
                            family = NA,species_code=NA,obs_effect=NA,location=NA,experiment=NA)
 predict_df_length$avg_length_scaled <- scale(predict_df_length$avg_length,scale=scaling_length,center=F)
 predict_df_length$predict_id <- paste("length_pred",seq(1,nrow(predict_df_length)),sep="_")
@@ -193,14 +208,15 @@ while(i <= B){
       rep.data[[i]] <- rep.data_i
       i <- i+1}
 }
-saveRDS(rep.data,paste("./Results_Figs_Tabs/rep.data_","10000_IGB",".RDS",sep=""))
+saveRDS(rep.data,paste("./Results_Figs_Tabs/rep.data_B",as.character(B),".RDS",sep=""))
+#rep.data <- readRDS("./Results_Figs_Tabs/rep.data_B1000.RDS")
 
 ###############################
 # Run replicated GLMM runs on bootstrapped dataframes
 ###############################
-bootstrap_results_glmm <- .cases.completion(model=glmm_B, rep.data=rep.data, fn=predict_boot)
-saveRDS(bootstrap_results_glmm,paste("./Results_Figs_Tabs/bootstrap_results_","10000_IGB",".RDS",sep=""))
-#bootstrap_results_glmm <- readRDS("./Results_Figs_Tabs/bootstrap_results_1000_IGB.RDS")
+bootstrap_results_glmm <- .cases.completion(model=glmm_G, rep.data=rep.data, fn=predict_boot)
+saveRDS(bootstrap_results_glmm,paste("./Results_Figs_Tabs/bootstrap_results_B",as.character(B),".RDS",sep=""))
+#bootstrap_results_glmm <- readRDS("./Results_Figs_Tabs/bootstrap_results_B1000.RDS")
 
 ###########################################
 ## Analyse bootstrapped model results (e.g. CI)
@@ -208,7 +224,8 @@ saveRDS(bootstrap_results_glmm,paste("./Results_Figs_Tabs/bootstrap_results_","1
 ## Get bootstrapped confidence intervals for model statistics and predicted values
 bc_df <- as.data.frame(tidy(bootstrap_results_glmm,conf.int=TRUE,conf.method="perc"))
 bootstrap_results_glmm$t0
-bc_df_coef <- bc_df[!grepl(".*pred.*",bc_df$term),]
+bc_df_coef <- bc_df[!grepl(".*pred.*",bc_df$term),]#
+round(bc_df_coef,2)
 bc_df_length <- bc_df[grepl("^length_pred.*",bc_df$term),]
 bc_df_length <- merge(bc_df_length,predict_df_length,by.x="term",by.y="predict_id")
 
@@ -216,7 +233,7 @@ bc_df_length <- merge(bc_df_length,predict_df_length,by.x="term",by.y="predict_i
 bc_df_length[bc_df_length$avg_length == 25,]
 
 ##########################################
-### Plot predicted relationship length vs. moratility across turbine types (incl 95% CI)
+### Plot predicted relationship length vs. mortality across turbine types (incl 95% CI)
 ##########################################
 # Level ordering
 mort_analysis_df$turbine_type <- factor(mort_analysis_df$turbine_type,
