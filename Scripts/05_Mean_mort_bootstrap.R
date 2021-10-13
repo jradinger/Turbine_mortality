@@ -86,6 +86,7 @@ bootstrap_avg_mort <- bootstrap_avg_mort_weighted(orig.data=turb_mort_df,
 as.data.frame(tidy(bootstrap_avg_mort,conf.int=TRUE,conf.method="perc"))
 sd(turb_mort_df$mort_rate)
 
+##########################
 # Across classes of uncertainty
 bootstrap_avg_mort_combined_uncertainty_classes <- bootstrap_avg_mort_weighted(orig.data=turb_mort_df,
                                                                                rep.data=rep.data,group_var="combined_uncertainty")
@@ -96,7 +97,6 @@ bootstrap_avg_mort_combined_uncertainty_classes_df$CI <- paste("(",round(bootstr
                                                                ")",sep="")
 bootstrap_avg_mort_combined_uncertainty_classes_df$post_monitoring_uncertainty <- unlist(purrr::map(strsplit(rownames(bootstrap_avg_mort_combined_uncertainty_classes_df),"_"),1))
 bootstrap_avg_mort_combined_uncertainty_classes_df$catch_related_uncertainty <- unlist(purrr::map(strsplit(rownames(bootstrap_avg_mort_combined_uncertainty_classes_df),"_"),2))
-
 print(xtable(bootstrap_avg_mort_combined_uncertainty_classes_df[,c("post_monitoring_uncertainty",
                                                                    "catch_related_uncertainty",
                                                                    "statistic",
@@ -192,14 +192,3 @@ bootstrap_avg_mort_turbine_type_df_combined <-
 print(xtable(bootstrap_avg_mort_turbine_type_df_combined[,c(1,2,6,5,7,11,10)], type = "latex"),
       file = "./Results_Figs_Tabs/bootstrap_avg_mort_turbine_type.tex",
       include.rownames=F)
-
-##########################
-# Across classes of uncertainty
-bootstrap_avg_mort_combined_uncertainty_classes <- bootstrap_avg_mort_weighted(orig.data=turb_mort_df,
-                                                                          rep.data=rep.data,group_var="combined_uncertainty")
-bootstrap_avg_mort_combined_uncertainty_classes_df <- multi.boot.ci(bootstrap_avg_mort_combined_uncertainty_classes)
-bootstrap_avg_mort_combined_uncertainty_classes_df <- cbind(bootstrap_avg_mort_combined_uncertainty_classes_df,n=as.vector(table(turb_mort_df$combined_uncertainty)))
-bootstrap_avg_mort_combined_uncertainty_classes_df$CI <- paste("(",round(bootstrap_avg_mort_combined_uncertainty_classes_df$conf.low,2),
-                                                          ", ",round(bootstrap_avg_mort_combined_uncertainty_classes_df$conf.high,2),
-                                                          ")",sep="")
-print(xtable(bootstrap_avg_mort_combined_uncertainty_classes_df[,c(1,5,4)], type = "latex"), file = "./Results_Figs_Tabs/bootstrap_avg_mort_combined_uncertainty_classes.tex")
