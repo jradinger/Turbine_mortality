@@ -63,6 +63,8 @@ mort_analysis_df <- completeFun(turb_mort_df, c("n_mort", "n_not_mort","mort_rat
                                                 "turbine_type","family","location",
                                                 "species_code","experiment","obs_effect"))
 mort_analysis_df <- droplevels(mort_analysis_df[!mort_analysis_df$turbine_type %in% c("Other"),])
+mort_analysis_df <- droplevels(mort_analysis_df[!mort_analysis_df$sampling_method %in% c("other"),])
+
 table(mort_analysis_df$turbine_type)
 summary(mort_analysis_df)
 
@@ -75,49 +77,49 @@ glmm_A <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled+
                   (1|obs_effect),
                 family=binomial,
                 data=mort_analysis_df,
-                control=glmerControl(calc.derivs=FALSE))
+                control=glmerControl(calc.derivs=FALSE,optimizer = "bobyqa"))
 glmm_B <- glmer(cbind(n_mort,n_not_mort)~turbine_type+
                   (1|location)+(1|location:experiment)+
                   (1|family)+(1|family:species_code)+
                   (1|obs_effect),
                 family=binomial,
                 data=mort_analysis_df,
-                control=glmerControl(calc.derivs=FALSE))
+                control=glmerControl(calc.derivs=FALSE,optimizer = "bobyqa"))
 glmm_C <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled+turbine_type+
                   (1|location)+(1|location:experiment)+
                   (1|family)+(1|family:species_code)+
                   (1|obs_effect),
                 family=binomial,
                 data=mort_analysis_df,
-                control=glmerControl(calc.derivs=FALSE))
+                control=glmerControl(calc.derivs=FALSE,optimizer = "bobyqa"))
 glmm_D <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled*turbine_type+
                   (1|location)+(1|location:experiment)+
                   (1|family)+(1|family:species_code)+
                   (1|obs_effect),
                 family=binomial,
                 data=mort_analysis_df,
-                control=glmerControl(calc.derivs=FALSE))
+                control=glmerControl(calc.derivs=FALSE,optimizer = "bobyqa"))
 glmm_E <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled*turbine_type+capacity_class+
                 (1|location)+(1|location:experiment)+
                   (1|family)+(1|family:species_code)+
                   (1|obs_effect),
                 family=binomial,
                 data=mort_analysis_df,
-                control=glmerControl(calc.derivs=FALSE))
+                control=glmerControl(calc.derivs=FALSE,optimizer = "bobyqa"))
 glmm_F <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled*turbine_type+sampling_method+
                 (1|location)+(1|location:experiment)+
                   (1|family)+(1|family:species_code)+
                   (1|obs_effect),
                 family=binomial,
                 data=mort_analysis_df,
-                control=glmerControl(calc.derivs=FALSE))
+                control=glmerControl(calc.derivs=FALSE,optimizer = "bobyqa"))
 glmm_G <- glmer(cbind(n_mort,n_not_mort)~avg_length_scaled*turbine_type+capacity_class+sampling_method+
                    (1|location)+(1|location:experiment)+
                    (1|family)+(1|family:species_code)+
                    (1|obs_effect),
                  family=binomial,
                  data=mort_analysis_df,
-                 control=glmerControl(calc.derivs=FALSE))
+                 control=glmerControl(calc.derivs=FALSE,optimizer = "bobyqa"))
 
 # Likelihoodratio-Test whether single variables and or interaction terms are relevant
 lrt_results <- anova(glmm_A,glmm_B,glmm_C,glmm_D,glmm_E,glmm_F,glmm_G)
@@ -209,7 +211,7 @@ while(i <= B){
       i <- i+1}
 }
 saveRDS(rep.data,paste("./Results_Figs_Tabs/rep.data_B",as.character(B),".RDS",sep=""))
-#rep.data <- readRDS("./Results_Figs_Tabs/rep.data_B1000.RDS")
+#rep.data <- readRDS("./Results_Figs_Tabs/rep.data_B5000.RDS")
 
 ###############################
 # Run replicated GLMM runs on bootstrapped dataframes
@@ -225,7 +227,6 @@ saveRDS(bootstrap_results_glmm,paste("./Results_Figs_Tabs/bootstrap_results_B",a
 bc_df <- as.data.frame(tidy(bootstrap_results_glmm,conf.int=TRUE,conf.method="perc"))
 bootstrap_results_glmm$t0
 bc_df_coef <- bc_df[!grepl(".*pred.*",bc_df$term),]#
-round(bc_df_coef,2)
 bc_df_length <- bc_df[grepl("^length_pred.*",bc_df$term),]
 bc_df_length <- merge(bc_df_length,predict_df_length,by.x="term",by.y="predict_id")
 
